@@ -5,6 +5,8 @@ resources:
     source:
       uri: https://github.com/anaik91/apigee-gitops.git
       branch: main
+    paths:
+    - src
 
   - name: apigee-runner-image
     type: docker-image
