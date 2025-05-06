@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Starting Apigee GitOps script for resource type: $RESOURCE_TYPE"
-JOB_STATUS="SUCCESS" # Assume success initially
+JOB_STATUS="SUCCESS"
 
 KEY_FILE_PATH="/tmp/sa-key.json"
 echo "$GCP_SA_KEY_JSON" > "$KEY_FILE_PATH"

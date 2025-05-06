@@ -40,14 +40,12 @@ task_run_apigee_script: &task_run_apigee_script_def
     APPLY_CHANGES: "false"
     CONFIG_PATH_IN_REPO: "src"
     GCP_PROJECT_ID_FOR_LOGGING: ((apigee-service-account-key))
-    CONCOURSE_BUILD_URL: # Injected by Concourse
-    CONCOURSE_JOB_NAME: # Injected by Concourse
-    CONCOURSE_BUILD_NAME: # Injected by Concourse
   run:
     path: sh 
     args:
     - -e
     - |
+      ls -l
       bash apigee-gitops-repo/pipeline/deploy.sh
 jobs:
   # --- Organization-Scoped Resource Jobs ---
