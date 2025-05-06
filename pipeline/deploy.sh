@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-
 echo "Starting Apigee GitOps script for resource type: $RESOURCE_TYPE"
 JOB_STATUS="SUCCESS"
 
@@ -8,7 +7,7 @@ KEY_FILE_PATH="/tmp/sa-key.json"
 echo "$GCP_SA_KEY_JSON" > "$KEY_FILE_PATH"
 chmod 400 "$KEY_FILE_PATH"
 gcloud config set project "$APIGEE_ORGANIZATION" --quiet
-gcloud auth activate-service-account --key-file="$KEY_FILE_PATH" --project="$GCP_PROJECT_ID_FOR_LOGGING" --quiet
+gcloud auth activate-service-account --key-file="$KEY_FILE_PATH"
 SCRIPT_ARGS="--org \"$APIGEE_ORGANIZATION\" --path \"apigee-gitops-repo/$CONFIG_PATH_IN_REPO\" --keyfile \"$KEY_FILE_PATH\" -t \"$RESOURCE_TYPE\" -v"
 if [ -n "$APIGEE_ENVIRONMENT" ]; then
     SCRIPT_ARGS="$SCRIPT_ARGS --env \"$APIGEE_ENVIRONMENT\""
