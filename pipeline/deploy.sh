@@ -22,7 +22,7 @@ fi
 echo "Executing: python3 /app/apigee_gitops_tool.py $SCRIPT_ARGS"
 # Capture exit code of the python script
 set +e # Disable exit on error temporarily
-python3 /app/apigee_gitops_tool.py "$SCRIPT_ARGS"
+python3 /app/apigee_gitops_tool.py $SCRIPT_ARGS
 SCRIPT_EXIT_CODE=$?
 
 if [ $SCRIPT_EXIT_CODE -ne 0 ]; then
