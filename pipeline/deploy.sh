@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 echo "Starting Apigee GitOps script for resource type: $RESOURCE_TYPE"
+/opt/venv/bin/activate
 JOB_STATUS="SUCCESS"
-
 KEY_FILE_PATH="/tmp/sa-key.json"
 echo "$GCP_SA_KEY_JSON" > "$KEY_FILE_PATH"
 chmod 400 "$KEY_FILE_PATH"
@@ -59,7 +59,7 @@ EOF
 )
 
 echo "Attempting to write log to Google Cloud Logging..."
-gcloud logging write "$LOG_NAME" "$JSON_PAYLOAD" --payload-type=json --project="$GCP_PROJECT_ID_FOR_LOGGING" \
+gcloud logging write "$LOG_NAME" "$JSON_PAYLOAD" --payload-type=json \
     --severity=$(if [ "$JOB_STATUS" = "SUCCESS" ]; then echo "INFO"; else echo "ERROR"; fi)
 
 # Clean up
