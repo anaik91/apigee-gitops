@@ -6,6 +6,8 @@ resources:
   source:
     uri: https://github.com/anaik91/apigee-gitops.git
     branch: main
+    paths:
+    - scripts/Dockerfile
 
 # Where we will push the image
 - name: apigee-gitops-image
