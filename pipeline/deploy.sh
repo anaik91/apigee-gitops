@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 echo "Starting Apigee GitOps script for resource type: $RESOURCE_TYPE"
-/opt/venv/bin/activate
 JOB_STATUS="SUCCESS"
 KEY_FILE_PATH="/tmp/sa-key.json"
 echo "$GCP_SA_KEY_JSON" > "$KEY_FILE_PATH"
@@ -12,12 +11,13 @@ SCRIPT_ARGS="--org \"$APIGEE_ORGANIZATION\" --path \"apigee-gitops-repo/$CONFIG_
 if [ -n "$APIGEE_ENVIRONMENT" ]; then
     SCRIPT_ARGS="$SCRIPT_ARGS --env \"$APIGEE_ENVIRONMENT\""
 fi
-if [ "$APPLY_CHANGES" = "true" ]; then
-    SCRIPT_ARGS="$SCRIPT_ARGS --ensure-git-state"
-    echo "WARNING: --ensure-git-state IS ENABLED. CHANGES WILL BE APPLIED."
-else
-    echo "INFO: Running in dry-run mode (--ensure-git-state is OFF)."
-fi
+
+# if [ "$APPLY_CHANGES" = "true" ]; then
+#     SCRIPT_ARGS="$SCRIPT_ARGS --ensure-git-state"
+#     echo "WARNING: --ensure-git-state IS ENABLED. CHANGES WILL BE APPLIED."
+# else
+#     echo "INFO: Running in dry-run mode (--ensure-git-state is OFF)."
+# fi
 
 echo "Executing: python3 /app/apigee_gitops_tool.py $SCRIPT_ARGS"
 # Capture exit code of the python script
