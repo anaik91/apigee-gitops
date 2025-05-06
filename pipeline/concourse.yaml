@@ -1,4 +1,9 @@
 resources:
+  - name: every-30s
+    type: time
+    icon: clock-outline
+    source:
+      interval: 30s
   - name: apigee-gitops-repo
     type: git
     icon: github
@@ -54,6 +59,8 @@ jobs:
     plan:
       - get: apigee-gitops-repo
         trigger: true
+      - get: every-30s
+        trigger: true
       - get: apigee-runner-image
         trigger: false
       - task: run-sync-developers
@@ -68,6 +75,8 @@ jobs:
     public: true
     plan:
       - get: apigee-gitops-repo
+        trigger: true
+      - get: every-30s
         trigger: true
 
       - get: apigee-runner-image
@@ -86,6 +95,8 @@ jobs:
     plan:
       - get: apigee-gitops-repo
         trigger: true
+      - get: every-30s
+        trigger: true
 
       - get: apigee-runner-image
         
@@ -102,6 +113,8 @@ jobs:
     public: true
     plan:
       - get: apigee-gitops-repo
+        trigger: true
+      - get: every-30s
         trigger: true
 
       - get: apigee-runner-image
@@ -120,6 +133,8 @@ jobs:
     plan:
       - get: apigee-gitops-repo
         trigger: true
+      - get: every-30s
+        trigger: true
 
       - get: apigee-runner-image
         
@@ -137,6 +152,8 @@ jobs:
     plan:
       - get: apigee-gitops-repo
         trigger: true
+      - get: every-30s
+        trigger: true
 
       - get: apigee-runner-image
         
@@ -149,8 +166,8 @@ jobs:
           APPLY_CHANGES: "false"
           APIGEE_ENVIRONMENT: ((apigee-env))
 
-# groups:
-#   - name: org-scoped
-#     jobs: [sync-developers, sync-apiproducts]
-#   - name: env-scoped
-#     jobs: [sync-targetservers, sync-resourcefiles, sync-flowhooks, sync-references]
+groups:
+  - name: org-scoped
+    jobs: [sync-developers, sync-apiproducts]
+  - name: env-scoped
+    jobs: [sync-targetservers, sync-resourcefiles, sync-flowhooks, sync-references]
