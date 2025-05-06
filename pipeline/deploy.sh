@@ -9,15 +9,15 @@ gcloud config set project "$APIGEE_ORGANIZATION" --quiet
 gcloud auth activate-service-account --key-file="$KEY_FILE_PATH"
 SCRIPT_ARGS="--org $APIGEE_ORGANIZATION --path apigee-gitops-repo/$CONFIG_PATH_IN_REPO --keyfile $KEY_FILE_PATH -t $RESOURCE_TYPE -v"
 if [ -n "$APIGEE_ENVIRONMENT" ]; then
-    SCRIPT_ARGS="$SCRIPT_ARGS --env \"$APIGEE_ENVIRONMENT\""
+    SCRIPT_ARGS="$SCRIPT_ARGS --env $APIGEE_ENVIRONMENT"
 fi
 
-# if [ "$APPLY_CHANGES" = "true" ]; then
-#     SCRIPT_ARGS="$SCRIPT_ARGS --ensure-git-state"
-#     echo "WARNING: --ensure-git-state IS ENABLED. CHANGES WILL BE APPLIED."
-# else
-#     echo "INFO: Running in dry-run mode (--ensure-git-state is OFF)."
-# fi
+if [ "$APPLY_CHANGES" = "true" ]; then
+    SCRIPT_ARGS="$SCRIPT_ARGS --ensure-git-state"
+    echo "WARNING: --ensure-git-state IS ENABLED. CHANGES WILL BE APPLIED."
+else
+    echo "INFO: Running in dry-run mode (--ensure-git-state is OFF)."
+fi
 
 echo "Executing: python3 /app/apigee_gitops_tool.py $SCRIPT_ARGS"
 # Capture exit code of the python script

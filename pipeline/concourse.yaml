@@ -35,15 +35,13 @@ task_run_apigee_script: &task_run_apigee_script_def
   params:
     GCP_SA_KEY_JSON: ((apigee-service-account-key))
     APIGEE_ORGANIZATION: ((apigee-org))
-    APIGEE_ENVIRONMENT: ((apigee-env))
-    RESOURCE_TYPE:
     APPLY_CHANGES: "false"
     CONFIG_PATH_IN_REPO: "src"
     GCP_PROJECT_ID_FOR_LOGGING: ((apigee-service-account-key))
   run:
     path: sh
     args:
-      - -e
+      - -euc
       - |
         echo "Starting Apigee Sync..."
         ls -l
@@ -63,7 +61,7 @@ jobs:
           <<: *task_run_apigee_script_def
         params:
           RESOURCE_TYPE: "developers"
-          APPLY_CHANGES: "true"
+          APPLY_CHANGES: "false"
           # APIGEE_ENVIRONMENT not needed
 
   - name: sync-apiproducts # Renamed
@@ -80,7 +78,7 @@ jobs:
           <<: *task_run_apigee_script_def
         params:
           RESOURCE_TYPE: "apiproducts"
-          APPLY_CHANGES: "true"
+          APPLY_CHANGES: "false"
 
   # --- Environment-Scoped Resource Jobs ---
   - name: sync-targetservers # Renamed
@@ -97,7 +95,7 @@ jobs:
           <<: *task_run_apigee_script_def
         params:
           RESOURCE_TYPE: "targetservers"
-          APPLY_CHANGES: "true"
+          APPLY_CHANGES: "false"
           APIGEE_ENVIRONMENT: ((apigee-env))
 
   - name: sync-resourcefiles # Renamed
@@ -114,7 +112,7 @@ jobs:
           <<: *task_run_apigee_script_def
         params:
           RESOURCE_TYPE: "resourcefiles"
-          APPLY_CHANGES: "true"
+          APPLY_CHANGES: "false"
           APIGEE_ENVIRONMENT: ((apigee-env))
 
   - name: sync-flowhooks # Renamed
@@ -131,7 +129,7 @@ jobs:
           <<: *task_run_apigee_script_def
         params:
           RESOURCE_TYPE: "flowhooks"
-          APPLY_CHANGES: "true"
+          APPLY_CHANGES: "false"
           APIGEE_ENVIRONMENT: ((apigee-env))
 
   - name: sync-references # Renamed
@@ -148,7 +146,7 @@ jobs:
           <<: *task_run_apigee_script_def
         params:
           RESOURCE_TYPE: "references"
-          APPLY_CHANGES: "true"
+          APPLY_CHANGES: "false"
           APIGEE_ENVIRONMENT: ((apigee-env))
 
 # groups:
