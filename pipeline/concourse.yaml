@@ -32,7 +32,7 @@ task_run_apigee_script: &task_run_apigee_script_def
   outputs: # Define an output for the status file
     - name: task-status
   params:
-    GCP_SA_KEY_JSON_BASE64: ((apigee-service-account-key))
+    GCP_SA_KEY_JSON: ((apigee-service-account-key))
     APIGEE_ORGANIZATION: ((apigee-org))
     APIGEE_ENVIRONMENT: ((apigee-env))
     RESOURCE_TYPE:
@@ -51,7 +51,7 @@ task_run_apigee_script: &task_run_apigee_script_def
         JOB_STATUS="SUCCESS" # Assume success initially
 
         KEY_FILE_PATH="/tmp/sa-key.json"
-        echo "$GCP_SA_KEY_JSON_BASE64" | base64 -d > "$KEY_FILE_PATH"
+        echo "$GCP_SA_KEY_JSON" > "$KEY_FILE_PATH"
         chmod 400 "$KEY_FILE_PATH"
         gcloud auth activate-service-account --key-file="$KEY_FILE_PATH" --project="$GCP_PROJECT_ID_FOR_LOGGING"
 
