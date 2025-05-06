@@ -43,7 +43,11 @@ task_run_apigee_script: &task_run_apigee_script_def
     CONCOURSE_JOB_NAME: # Injected by Concourse
     CONCOURSE_BUILD_NAME: # Injected by Concourse
   run:
-    path: pipeline/deploy.sh
+    path: sh 
+    args:
+    - -euc # Exit on error, print commands, error on unset variables
+    - |
+      bash apigee-gitops-repo/pipeline/deploy.sh
 jobs:
   # --- Organization-Scoped Resource Jobs ---
   - name: sync-developers # Renamed
