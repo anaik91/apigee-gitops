@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 echo "Starting Apigee GitOps script for resource type: $RESOURCE_TYPE"
 JOB_STATUS="SUCCESS"
@@ -6,8 +7,8 @@ JOB_STATUS="SUCCESS"
 KEY_FILE_PATH="/tmp/sa-key.json"
 echo "$GCP_SA_KEY_JSON" > "$KEY_FILE_PATH"
 chmod 400 "$KEY_FILE_PATH"
-gcloud auth activate-service-account --key-file="$KEY_FILE_PATH" --project="$GCP_PROJECT_ID_FOR_LOGGING"
 gcloud config set project "$APIGEE_ORGANIZATION"
+gcloud auth activate-service-account --key-file="$KEY_FILE_PATH" --project="$GCP_PROJECT_ID_FOR_LOGGING"
 SCRIPT_ARGS="--org \"$APIGEE_ORGANIZATION\" --path \"apigee-gitops-repo/$CONFIG_PATH_IN_REPO\" --keyfile \"$KEY_FILE_PATH\" -t \"$RESOURCE_TYPE\" -v"
 if [ -n "$APIGEE_ENVIRONMENT" ]; then
     SCRIPT_ARGS="$SCRIPT_ARGS --env \"$APIGEE_ENVIRONMENT\""
@@ -24,7 +25,6 @@ echo "Executing: python3 /app/apigee_gitops_tool.py $SCRIPT_ARGS"
 set +e # Disable exit on error temporarily
 python3 /app/apigee_gitops_tool.py "$SCRIPT_ARGS"
 SCRIPT_EXIT_CODE=$?
-set -e # Re-enable exit on error
 
 if [ $SCRIPT_EXIT_CODE -ne 0 ]; then
     echo "Python script failed with exit code $SCRIPT_EXIT_CODE"
