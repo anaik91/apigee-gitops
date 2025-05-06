@@ -1,0 +1,6 @@
+{
+    "name": "demo1",
+    "host": "demo1.apigee.net",
+    "port": 8080,
+    "isEnabled": true
+  }

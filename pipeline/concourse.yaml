@@ -1,9 +1,3 @@
-# (( Grab secrets from your Concourse secret manager or vars file ))
-# Example using Concourse vars (less secure for actual keys, use a secret manager for production)
-# gcp_service_account_key_base64: ((gcp_sa_key_json_base64)) # Base64 encoded JSON key
-# apigee_organization: ((apigee_org_id))
-# apigee_environment: ((apigee_env_id)) # Optional, for env-scoped resources
-
 resource_types:
   - name: cron
     type: docker-image
@@ -26,52 +20,57 @@ resources:
       expression: "0 3 * * *" # Run daily at 3 AM UTC
       location: "UTC"
 
-  # Docker image for running the script (assuming it's pre-built and in a registry)
   - name: apigee-runner-image
     type: docker-image
     icon: docker
     source:
-      repository: your-docker-registry/apigee-gitops-runner # e.g., gcr.io/my-project/apigee-gitops-runner
-      tag: latest # Or a specific version
-      # Add username/password if your registry is private and not accessible via worker's IAM
+      repository: ((docker-image-repo-name))/apigee-gitops-image
+      tag: latest
+      username: ((docker-registry-username))
+      password: ((docker-registry-password))
 
-# Define a reusable task configuration for running the Apigee script
+# Reusable task configuration
 task_run_apigee_script: &task_run_apigee_script_def
   platform: linux
   image_resource:
     type: docker-image
     source:
-      repository: ((docker_image_repository)) # Parameterized image repo
-      tag: ((docker_image_tag))            # Parameterized image tag
+      repository: ((docker-image-repo-name))/apigee-gitops-image
+      tag: latest
+      username: ((docker-registry-username))
+      password: ((docker-registry-password))
   inputs:
-    - name: apigee-gitops-repo # The checked-out Git repository
+    - name: apigee-gitops-repo
+  outputs: # Define an output for the status file
+    - name: task-status
   params:
-    GCP_SA_KEY_JSON_BASE64: ((apigee-service-account-key)) # Passed as param
-    APIGEE_ORGANIZATION: ((apigee_org))
-    APIGEE_ENVIRONMENT: ((apigee_environment)) # Optional, used if the job needs it
-    RESOURCE_TYPE: # This will be overridden by each job
-    APPLY_CHANGES: "false" # Default to dry-run, override to "true" for apply jobs
-    CONFIG_PATH_IN_REPO: "src" # Path to Apigee config within the Git repo
+    GCP_SA_KEY_JSON_BASE64: ((gcp_service_account_key_base64))
+    APIGEE_ORGANIZATION: ((apigee-org))
+    APIGEE_ENVIRONMENT: ((apigee-env))
+    RESOURCE_TYPE:
+    APPLY_CHANGES: "false"
+    CONFIG_PATH_IN_REPO: "src"
+    GCP_PROJECT_ID_FOR_LOGGING: ((gcp_project_id_for_logging))
+    CONCOURSE_BUILD_URL: # Injected by Concourse
+    CONCOURSE_JOB_NAME: # Injected by Concourse
+    CONCOURSE_BUILD_NAME: # Injected by Concourse
   run:
     path: sh
     args:
-      - -exc
+      - -ec
       - |
         echo "Starting Apigee GitOps script for resource type: $RESOURCE_TYPE"
+        JOB_STATUS="SUCCESS" # Assume success initially
 
         KEY_FILE_PATH="/tmp/sa-key.json"
         echo "$GCP_SA_KEY_JSON_BASE64" | base64 -d > "$KEY_FILE_PATH"
-        chmod 400 "$KEY_FILE_PATH" # Restrict permissions
+        chmod 400 "$KEY_FILE_PATH"
+        gcloud auth activate-service-account --key-file="$KEY_FILE_PATH" --project="$GCP_PROJECT_ID_FOR_LOGGING"
 
-        # Construct script arguments
         SCRIPT_ARGS="--org \"$APIGEE_ORGANIZATION\" --path \"apigee-gitops-repo/$CONFIG_PATH_IN_REPO\" --keyfile \"$KEY_FILE_PATH\" -t \"$RESOURCE_TYPE\" -v"
-
-        # Add --env only if APIGEE_ENVIRONMENT is set and non-empty
         if [ -n "$APIGEE_ENVIRONMENT" ]; then
           SCRIPT_ARGS="$SCRIPT_ARGS --env \"$APIGEE_ENVIRONMENT\""
         fi
-
-        # Add --ensure-git-state if APPLY_CHANGES is true
         if [ "$APPLY_CHANGES" = "true" ]; then
           SCRIPT_ARGS="$SCRIPT_ARGS --ensure-git-state"
           echo "WARNING: --ensure-git-state IS ENABLED. CHANGES WILL BE APPLIED."
@@ -80,36 +79,67 @@ task_run_apigee_script: &task_run_apigee_script_def
         fi
 
         echo "Executing: python3 /app/apigee_gitops_tool.py $SCRIPT_ARGS"
+        # Capture exit code of the python script
+        set +e # Disable exit on error temporarily
         python3 /app/apigee_gitops_tool.py $SCRIPT_ARGS
+        SCRIPT_EXIT_CODE=$?
+        set -e # Re-enable exit on error
 
-        # Clean up the key file
+        if [ $SCRIPT_EXIT_CODE -ne 0 ]; then
+          echo "Python script failed with exit code $SCRIPT_EXIT_CODE"
+          JOB_STATUS="FAILURE"
+        else
+          echo "Python script completed successfully."
+        fi
+
+        # --- Notification Stage (Log to Google Cloud Logging) ---
+        LOG_NAME="concourse-apigee-gitops-jobs" # Common log name for all jobs
+        CONCOURSE_URL="${ATC_EXTERNAL_URL:-unknown-concourse-url}" # Get Concourse URL if available
+        BUILD_LINK="$CONCOURSE_URL/teams/$CONCOURSE_TEAM_NAME/pipelines/$CONCOURSE_PIPELINE_NAME/jobs/$CONCOURSE_JOB_NAME/builds/$CONCOURSE_BUILD_NAME"
+
+        # Prepare JSON payload for structured logging
+        JSON_PAYLOAD=$(cat <<EOF
+        {
+          "message": "Concourse job '$CONCOURSE_JOB_NAME' for Apigee resource '$RESOURCE_TYPE' finished with status: $JOB_STATUS.",
+          "concourse": {
+            "team": "$CONCOURSE_TEAM_NAME",
+            "pipeline": "$CONCOURSE_PIPELINE_NAME",
+            "job": "$CONCOURSE_JOB_NAME",
+            "build_id": "$CONCOURSE_BUILD_ID",
+            "build_name": "$CONCOURSE_BUILD_NAME",
+            "build_link": "$BUILD_LINK"
+          },
+          "apigee_org": "$APIGEE_ORGANIZATION",
+          "apigee_env": "${APIGEE_ENVIRONMENT:-N/A}",
+          "resource_type_processed": "$RESOURCE_TYPE",
+          "apply_changes_enabled": "$APPLY_CHANGES",
+          "script_exit_code": "$SCRIPT_EXIT_CODE"
+        }
+        EOF
+        )
+
+        echo "Attempting to write log to Google Cloud Logging..."
+        gcloud logging write "$LOG_NAME" "$JSON_PAYLOAD" --payload-type=json --project="$GCP_PROJECT_ID_FOR_LOGGING" \
+          --severity=$(if [ "$JOB_STATUS" = "SUCCESS" ]; then echo "INFO"; else echo "ERROR"; fi)
+
+        # Clean up
         rm -f "$KEY_FILE_PATH"
-        echo "Apigee GitOps script finished for resource type: $RESOURCE_TYPE"
+        gcloud auth revoke --all 2>/dev/null || true # Revoke SA creds used by gcloud
+
+        echo "Apigee GitOps script and logging finished for resource type: $RESOURCE_TYPE"
+
+        # Write status to an output file for Concourse (optional, but good for chaining)
+        echo "$JOB_STATUS" > task-status/status.txt
+
+        # Ensure the task exits with the script's exit code if it failed,
+        # or if logging fails and we want to mark the task as failed.
+        if [ "$JOB_STATUS" = "FAILURE" ]; then
+          exit $SCRIPT_EXIT_CODE # Or exit 1 if you want a generic failure code
+        fi
 
 jobs:
   # --- Organization-Scoped Resource Jobs ---
-  - name: manage-developers
-    public: true
-    plan:
-      - get: apigee-gitops-repo
-        trigger: true # Trigger on new commits to main
-      - get: daily-cron-trigger
-        trigger: true # Also trigger on cron
-      - get: apigee-runner-image # Ensure image is available
-        passed: [apigee-gitops-repo, daily-cron-trigger] # Only if previous steps pass/trigger
-        trigger: false # Image itself doesn't trigger, just needs to be fetched
-      - task: run-developers-script
-        config:
-          <<: *task_run_apigee_script_def # Use the YAML anchor
-        params:
-          RESOURCE_TYPE: "developers"
-          APPLY_CHANGES: "true" # Or "false" for a dry-run only job
-          # APIGEE_ENVIRONMENT is not needed for org-scoped developers
-          docker_image_repository: ((docker_image_repository))
-          docker_image_tag: ((docker_image_tag))
-
-
-  - name: manage-apiproducts
+  - name: sync-developers # Renamed
     public: true
     plan:
       - get: apigee-gitops-repo
@@ -117,20 +147,35 @@ jobs:
       - get: daily-cron-trigger
         trigger: true
       - get: apigee-runner-image
-        passed: [apigee-gitops-repo, daily-cron-trigger]
+        
         trigger: false
-      - task: run-apiproducts-script
+      - task: run-sync-developers
+        config:
+          <<: *task_run_apigee_script_def
+        params:
+          RESOURCE_TYPE: "developers"
+          APPLY_CHANGES: "true"
+          # APIGEE_ENVIRONMENT not needed
+
+  - name: sync-apiproducts # Renamed
+    public: true
+    plan:
+      - get: apigee-gitops-repo
+        trigger: true
+      - get: daily-cron-trigger
+        trigger: true
+      - get: apigee-runner-image
+        
+        trigger: false
+      - task: run-sync-apiproducts
         config:
           <<: *task_run_apigee_script_def
         params:
           RESOURCE_TYPE: "apiproducts"
           APPLY_CHANGES: "true"
-          docker_image_repository: ((docker_image_repository))
-          docker_image_tag: ((docker_image_tag))
 
   # --- Environment-Scoped Resource Jobs ---
-  # These jobs require APIGEE_ENVIRONMENT to be set in their params or globally
-  - name: manage-targetservers
+  - name: sync-targetservers # Renamed
     public: true
     plan:
       - get: apigee-gitops-repo
@@ -138,19 +183,17 @@ jobs:
       - get: daily-cron-trigger
         trigger: true
       - get: apigee-runner-image
-        passed: [apigee-gitops-repo, daily-cron-trigger]
+        
         trigger: false
-      - task: run-targetservers-script
+      - task: run-sync-targetservers
         config:
           <<: *task_run_apigee_script_def
         params:
           RESOURCE_TYPE: "targetservers"
           APPLY_CHANGES: "true"
-          APIGEE_ENVIRONMENT: ((apigee_environment)) # This job needs the environment
-          docker_image_repository: ((docker_image_repository))
-          docker_image_tag: ((docker_image_tag))
+          APIGEE_ENVIRONMENT: ((apigee-env))
 
-  - name: manage-resourcefiles
+  - name: sync-resourcefiles # Renamed
     public: true
     plan:
       - get: apigee-gitops-repo
@@ -158,19 +201,17 @@ jobs:
       - get: daily-cron-trigger
         trigger: true
       - get: apigee-runner-image
-        passed: [apigee-gitops-repo, daily-cron-trigger]
+        
         trigger: false
-      - task: run-resourcefiles-script
+      - task: run-sync-resourcefiles
         config:
           <<: *task_run_apigee_script_def
         params:
           RESOURCE_TYPE: "resourcefiles"
           APPLY_CHANGES: "true"
-          APIGEE_ENVIRONMENT: ((apigee_environment))
-          docker_image_repository: ((docker_image_repository))
-          docker_image_tag: ((docker_image_tag))
+          APIGEE_ENVIRONMENT: ((apigee-env))
 
-  - name: manage-flowhooks
+  - name: sync-flowhooks # Renamed
     public: true
     plan:
       - get: apigee-gitops-repo
@@ -178,19 +219,17 @@ jobs:
       - get: daily-cron-trigger
         trigger: true
       - get: apigee-runner-image
-        passed: [apigee-gitops-repo, daily-cron-trigger]
+        
         trigger: false
-      - task: run-flowhooks-script
+      - task: run-sync-flowhooks
         config:
           <<: *task_run_apigee_script_def
         params:
           RESOURCE_TYPE: "flowhooks"
           APPLY_CHANGES: "true"
-          APIGEE_ENVIRONMENT: ((apigee_environment))
-          docker_image_repository: ((docker_image_repository))
-          docker_image_tag: ((docker_image_tag))
+          APIGEE_ENVIRONMENT: ((apigee-env))
 
-  - name: manage-references
+  - name: sync-references # Renamed
     public: true
     plan:
       - get: apigee-gitops-repo
@@ -198,27 +237,18 @@ jobs:
       - get: daily-cron-trigger
         trigger: true
       - get: apigee-runner-image
-        passed: [apigee-gitops-repo, daily-cron-trigger]
+        
         trigger: false
-      - task: run-references-script
+      - task: run-sync-references
         config:
           <<: *task_run_apigee_script_def
         params:
           RESOURCE_TYPE: "references"
           APPLY_CHANGES: "true"
-          APIGEE_ENVIRONMENT: ((apigee_environment))
-          docker_image_repository: ((docker_image_repository))
-          docker_image_tag: ((docker_image_tag))
+          APIGEE_ENVIRONMENT: ((apigee-env))
 
-# --- Grouping (Optional, for UI organization) ---
-groups:
-  - name: org-scoped
-    jobs:
-      - manage-developers
-      - manage-apiproducts
-  - name: env-scoped
-    jobs:
-      - manage-targetservers
-      - manage-resourcefiles
-      - manage-flowhooks
-      - manage-references
+# groups:
+#   - name: org-scoped
+#     jobs: [sync-developers, sync-apiproducts]
+#   - name: env-scoped
+#     jobs: [sync-targetservers, sync-resourcefiles, sync-flowhooks, sync-references]
