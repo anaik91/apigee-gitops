@@ -7,6 +7,7 @@ resources:
       branch: main
       paths:
       - src/*
+      - pipeline/*.sh
 
   - name: apigee-runner-image
     type: docker-image
@@ -45,7 +46,7 @@ task_run_apigee_script: &task_run_apigee_script_def
   run:
     path: sh 
     args:
-    - -euc # Exit on error, print commands, error on unset variables
+    - -e
     - |
       bash apigee-gitops-repo/pipeline/deploy.sh
 jobs:
