@@ -1,0 +1,9 @@
+{
+    "name": "sample_ssl",
+    "host": "demo1.apigee.net",
+    "port": 443,
+    "isEnabled": true,
+    "sSLInfo": {
+      "enabled": true
+    }
+  }

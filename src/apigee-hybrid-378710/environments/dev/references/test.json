@@ -1,0 +1,5 @@
+{
+    "name": "test",
+    "resourceType": "KeyStore",
+    "refers": "test"
+  }

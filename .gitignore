@@ -1,0 +1,185 @@
+# Python
+################################################################################
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+# Usually dist/ or build/ are used for PyInstaller, covered above
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+pytestdebug.log
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+
+# Docker
+################################################################################
+# Docker-specific files to ignore (if any locally generated beyond the image itself)
+# Often, Docker images are built in CI/CD and not stored in Git.
+# If you have local docker-compose overrides or similar, you might add them here.
+# .dockerignore should handle what's NOT copied into the image.
+# This .gitignore handles what's not committed to Git.
+# docker-compose.override.yml # Example if you use local overrides not for general use
+
+# IDEs and Editors
+################################################################################
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains (PyCharm, IntelliJ, etc.)
+.idea/
+*.iws
+*.iml
+out/ # Default output dir for IntelliJ/PyCharm
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Atom
+.atom/
+
+# Eclipse
+.project
+.pydevproject
+.settings/
+.buildpath
+
+# NetBeans
+nbproject/
+
+# macOS / Windows
+################################################################################
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+# Thumbnails
+._*
+# Files that might appear in the root of a volume
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+# Desktop.ini
+# $RECYCLE.BIN/
+
+# Generic / Temporary
+################################################################################
+*.log
+*.log.*
+logs/
+temp/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~
+*.orig
+local_settings.py # Often used for local overrides of settings
+
+# Secrets / Sensitive Information
+################################################################################
+# Never commit actual secret files. Use environment variables or a secrets manager.
+# If you have a naming convention for local-only secret files, add it here.
+# Example:
+# secrets.json
+# *.key
+# *.pem
+# service-account-key.json # Specifically if you ever download one for testing
+
+# Project Specific
+################################################################################
+# Add any other files or directories specific to your project that
+# should not be committed. For example, if your script generates
+# output reports that aren't meant for Git:
+# output_reports/
+# comparison_results.txt
+
+# What NOT to ignore (override previous rules if necessary)
+# For example, if you have a specific .env file that IS a template
+# !.env.example
+
+# IMPORTANT: Your Apigee configuration JSON files (e.g., inside `src/`)
+# should NOT be listed here. They are the core of your GitOps repository
+# and *must* be committed to Git.

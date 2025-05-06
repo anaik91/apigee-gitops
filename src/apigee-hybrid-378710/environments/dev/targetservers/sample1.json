@@ -1,0 +1,6 @@
+{
+    "name": "sample1",
+    "host": "demo1.apigee.net",
+    "port": 443,
+    "isEnabled": true
+  }

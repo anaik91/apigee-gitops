@@ -1,0 +1,226 @@
+# (( Grab secrets from your Concourse secret manager or vars file ))
+# Example using Concourse vars (less secure for actual keys, use a secret manager for production)
+# gcp_service_account_key_base64: ((gcp_sa_key_json_base64)) # Base64 encoded JSON key
+# apigee_organization: ((apigee_org_id))
+# apigee_environment: ((apigee_env_id)) # Optional, for env-scoped resources
+
+resource_types:
+  - name: cron
+    type: docker-image
+    source:
+      repository: cftoolsmiths/cron-resource
+      tag: latest
+
+resources:
+  - name: apigee-gitops-repo
+    type: git
+    icon: github
+    source:
+      uri: git@github.com:your-username/your-apigee-gitops-repo.git # Your Git repo URI
+      branch: main
+      private_key: ((git_private_key)) # For private SSH repos
+      # Or use username/password for HTTPS, or public repo needs no auth
+
+  - name: daily-cron-trigger
+    type: cron
+    icon: clock-outline
+    source:
+      expression: "0 3 * * *" # Run daily at 3 AM UTC
+      location: "UTC"
+
+  # Docker image for running the script (assuming it's pre-built and in a registry)
+  - name: apigee-runner-image
+    type: docker-image
+    icon: docker
+    source:
+      repository: your-docker-registry/apigee-gitops-runner # e.g., gcr.io/my-project/apigee-gitops-runner
+      tag: latest # Or a specific version
+      # Add username/password if your registry is private and not accessible via worker's IAM
+
+# Define a reusable task configuration for running the Apigee script
+task_run_apigee_script: &task_run_apigee_script_def
+  platform: linux
+  image_resource:
+    type: docker-image
+    source:
+      repository: ((docker_image_repository)) # Parameterized image repo
+      tag: ((docker_image_tag))            # Parameterized image tag
+  inputs:
+    - name: apigee-gitops-repo # The checked-out Git repository
+  params:
+    GCP_SA_KEY_JSON_BASE64: ((gcp_service_account_key_base64)) # Passed as param
+    APIGEE_ORGANIZATION: ((apigee_organization))
+    APIGEE_ENVIRONMENT: ((apigee_environment)) # Optional, used if the job needs it
+    RESOURCE_TYPE: # This will be overridden by each job
+    APPLY_CHANGES: "false" # Default to dry-run, override to "true" for apply jobs
+    CONFIG_PATH_IN_REPO: "src" # Path to Apigee config within the Git repo
+  run:
+    path: sh
+    args:
+      - -exc
+      - |
+        echo "Starting Apigee GitOps script for resource type: $RESOURCE_TYPE"
+
+        KEY_FILE_PATH="/tmp/sa-key.json"
+        echo "$GCP_SA_KEY_JSON_BASE64" | base64 -d > "$KEY_FILE_PATH"
+        chmod 400 "$KEY_FILE_PATH" # Restrict permissions
+
+        # Construct script arguments
+        SCRIPT_ARGS="--org \"$APIGEE_ORGANIZATION\" --path \"apigee-gitops-repo/$CONFIG_PATH_IN_REPO\" --keyfile \"$KEY_FILE_PATH\" -t \"$RESOURCE_TYPE\" -v"
+
+        # Add --env only if APIGEE_ENVIRONMENT is set and non-empty
+        if [ -n "$APIGEE_ENVIRONMENT" ]; then
+          SCRIPT_ARGS="$SCRIPT_ARGS --env \"$APIGEE_ENVIRONMENT\""
+        fi
+
+        # Add --ensure-git-state if APPLY_CHANGES is true
+        if [ "$APPLY_CHANGES" = "true" ]; then
+          SCRIPT_ARGS="$SCRIPT_ARGS --ensure-git-state"
+          echo "WARNING: --ensure-git-state IS ENABLED. CHANGES WILL BE APPLIED."
+        else
+          echo "INFO: Running in dry-run mode (--ensure-git-state is OFF)."
+        fi
+
+        echo "Executing: python3 /app/apigee_gitops_tool.py $SCRIPT_ARGS"
+        python3 /app/apigee_gitops_tool.py $SCRIPT_ARGS
+
+        # Clean up the key file
+        rm -f "$KEY_FILE_PATH"
+        echo "Apigee GitOps script finished for resource type: $RESOURCE_TYPE"
+
+jobs:
+  # --- Organization-Scoped Resource Jobs ---
+  - name: manage-developers
+    public: true
+    plan:
+      - get: apigee-gitops-repo
+        trigger: true # Trigger on new commits to main
+      - get: daily-cron-trigger
+        trigger: true # Also trigger on cron
+      - get: apigee-runner-image # Ensure image is available
+        passed: [apigee-gitops-repo, daily-cron-trigger] # Only if previous steps pass/trigger
+        trigger: false # Image itself doesn't trigger, just needs to be fetched
+      - task: run-developers-script
+        config:
+          <<: *task_run_apigee_script_def # Use the YAML anchor
+        params:
+          RESOURCE_TYPE: "developers"
+          APPLY_CHANGES: "true" # Or "false" for a dry-run only job
+          # APIGEE_ENVIRONMENT is not needed for org-scoped developers
+          docker_image_repository: ((docker_image_repository))
+          docker_image_tag: ((docker_image_tag))
+
+
+  - name: manage-apiproducts
+    public: true
+    plan:
+      - get: apigee-gitops-repo
+        trigger: true
+      - get: daily-cron-trigger
+        trigger: true
+      - get: apigee-runner-image
+        passed: [apigee-gitops-repo, daily-cron-trigger]
+        trigger: false
+      - task: run-apiproducts-script
+        config:
+          <<: *task_run_apigee_script_def
+        params:
+          RESOURCE_TYPE: "apiproducts"
+          APPLY_CHANGES: "true"
+          docker_image_repository: ((docker_image_repository))
+          docker_image_tag: ((docker_image_tag))
+
+  # --- Environment-Scoped Resource Jobs ---
+  # These jobs require APIGEE_ENVIRONMENT to be set in their params or globally
+  - name: manage-targetservers
+    public: true
+    plan:
+      - get: apigee-gitops-repo
+        trigger: true
+      - get: daily-cron-trigger
+        trigger: true
+      - get: apigee-runner-image
+        passed: [apigee-gitops-repo, daily-cron-trigger]
+        trigger: false
+      - task: run-targetservers-script
+        config:
+          <<: *task_run_apigee_script_def
+        params:
+          RESOURCE_TYPE: "targetservers"
+          APPLY_CHANGES: "true"
+          APIGEE_ENVIRONMENT: ((apigee_environment)) # This job needs the environment
+          docker_image_repository: ((docker_image_repository))
+          docker_image_tag: ((docker_image_tag))
+
+  - name: manage-resourcefiles
+    public: true
+    plan:
+      - get: apigee-gitops-repo
+        trigger: true
+      - get: daily-cron-trigger
+        trigger: true
+      - get: apigee-runner-image
+        passed: [apigee-gitops-repo, daily-cron-trigger]
+        trigger: false
+      - task: run-resourcefiles-script
+        config:
+          <<: *task_run_apigee_script_def
+        params:
+          RESOURCE_TYPE: "resourcefiles"
+          APPLY_CHANGES: "true"
+          APIGEE_ENVIRONMENT: ((apigee_environment))
+          docker_image_repository: ((docker_image_repository))
+          docker_image_tag: ((docker_image_tag))
+
+  - name: manage-flowhooks
+    public: true
+    plan:
+      - get: apigee-gitops-repo
+        trigger: true
+      - get: daily-cron-trigger
+        trigger: true
+      - get: apigee-runner-image
+        passed: [apigee-gitops-repo, daily-cron-trigger]
+        trigger: false
+      - task: run-flowhooks-script
+        config:
+          <<: *task_run_apigee_script_def
+        params:
+          RESOURCE_TYPE: "flowhooks"
+          APPLY_CHANGES: "true"
+          APIGEE_ENVIRONMENT: ((apigee_environment))
+          docker_image_repository: ((docker_image_repository))
+          docker_image_tag: ((docker_image_tag))
+
+  - name: manage-references
+    public: true
+    plan:
+      - get: apigee-gitops-repo
+        trigger: true
+      - get: daily-cron-trigger
+        trigger: true
+      - get: apigee-runner-image
+        passed: [apigee-gitops-repo, daily-cron-trigger]
+        trigger: false
+      - task: run-references-script
+        config:
+          <<: *task_run_apigee_script_def
+        params:
+          RESOURCE_TYPE: "references"
+          APPLY_CHANGES: "true"
+          APIGEE_ENVIRONMENT: ((apigee_environment))
+          docker_image_repository: ((docker_image_repository))
+          docker_image_tag: ((docker_image_tag))
+
+# --- Grouping (Optional, for UI organization) ---
+groups:
+  - name: org-scoped
+    jobs:
+      - manage-developers
+      - manage-apiproducts
+  - name: env-scoped
+    jobs:
+      - manage-targetservers
+      - manage-resourcefiles
+      - manage-flowhooks
+      - manage-references
