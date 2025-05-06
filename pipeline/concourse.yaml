@@ -1,10 +1,3 @@
-resource_types:
-  - name: cron
-    type: docker-image
-    source:
-      repository: cftoolsmiths/cron-resource
-      tag: latest
-
 resources:
   - name: apigee-gitops-repo
     type: git
@@ -12,13 +5,6 @@ resources:
     source:
       uri: https://github.com/anaik91/apigee-gitops.git
       branch: main
-
-  - name: daily-cron-trigger
-    type: cron
-    icon: clock-outline
-    source:
-      expression: "0 3 * * *" # Run daily at 3 AM UTC
-      location: "UTC"
 
   - name: apigee-runner-image
     type: docker-image
@@ -44,13 +30,13 @@ task_run_apigee_script: &task_run_apigee_script_def
   outputs: # Define an output for the status file
     - name: task-status
   params:
-    GCP_SA_KEY_JSON_BASE64: ((gcp_service_account_key_base64))
+    GCP_SA_KEY_JSON_BASE64: ((apigee-service-account-key))
     APIGEE_ORGANIZATION: ((apigee-org))
     APIGEE_ENVIRONMENT: ((apigee-env))
     RESOURCE_TYPE:
     APPLY_CHANGES: "false"
     CONFIG_PATH_IN_REPO: "src"
-    GCP_PROJECT_ID_FOR_LOGGING: ((gcp_project_id_for_logging))
+    GCP_PROJECT_ID_FOR_LOGGING: ((apigee-service-account-key))
     CONCOURSE_BUILD_URL: # Injected by Concourse
     CONCOURSE_JOB_NAME: # Injected by Concourse
     CONCOURSE_BUILD_NAME: # Injected by Concourse
@@ -144,8 +130,7 @@ jobs:
     plan:
       - get: apigee-gitops-repo
         trigger: true
-      - get: daily-cron-trigger
-        trigger: true
+
       - get: apigee-runner-image
         
         trigger: false
@@ -162,8 +147,7 @@ jobs:
     plan:
       - get: apigee-gitops-repo
         trigger: true
-      - get: daily-cron-trigger
-        trigger: true
+
       - get: apigee-runner-image
         
         trigger: false
@@ -180,8 +164,7 @@ jobs:
     plan:
       - get: apigee-gitops-repo
         trigger: true
-      - get: daily-cron-trigger
-        trigger: true
+
       - get: apigee-runner-image
         
         trigger: false
@@ -198,8 +181,7 @@ jobs:
     plan:
       - get: apigee-gitops-repo
         trigger: true
-      - get: daily-cron-trigger
-        trigger: true
+
       - get: apigee-runner-image
         
         trigger: false
@@ -216,8 +198,7 @@ jobs:
     plan:
       - get: apigee-gitops-repo
         trigger: true
-      - get: daily-cron-trigger
-        trigger: true
+
       - get: apigee-runner-image
         
         trigger: false
@@ -234,8 +215,7 @@ jobs:
     plan:
       - get: apigee-gitops-repo
         trigger: true
-      - get: daily-cron-trigger
-        trigger: true
+
       - get: apigee-runner-image
         
         trigger: false
