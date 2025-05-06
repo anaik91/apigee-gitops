@@ -16,10 +16,8 @@ resources:
     type: git
     icon: github
     source:
-      uri: git@github.com:your-username/your-apigee-gitops-repo.git # Your Git repo URI
+      uri: https://github.com/anaik91/apigee-gitops.git
       branch: main
-      private_key: ((git_private_key)) # For private SSH repos
-      # Or use username/password for HTTPS, or public repo needs no auth
 
   - name: daily-cron-trigger
     type: cron
@@ -48,8 +46,8 @@ task_run_apigee_script: &task_run_apigee_script_def
   inputs:
     - name: apigee-gitops-repo # The checked-out Git repository
   params:
-    GCP_SA_KEY_JSON_BASE64: ((gcp_service_account_key_base64)) # Passed as param
-    APIGEE_ORGANIZATION: ((apigee_organization))
+    GCP_SA_KEY_JSON_BASE64: ((apigee-service-account-key)) # Passed as param
+    APIGEE_ORGANIZATION: ((apigee_org))
     APIGEE_ENVIRONMENT: ((apigee_environment)) # Optional, used if the job needs it
     RESOURCE_TYPE: # This will be overridden by each job
     APPLY_CHANGES: "false" # Default to dry-run, override to "true" for apply jobs

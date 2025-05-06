@@ -1,0 +1,42 @@
+resources:
+# The repo with our Dockerfile
+- name: apigee-gitops-repo
+  type: git
+  icon: github
+  source:
+    uri: https://github.com/anaik91/apigee-gitops.git
+    branch: main
+
+# Where we will push the image
+- name: apigee-gitops-image
+  type: registry-image
+  icon: docker
+  source:
+    repository: ((docker-image-repo-name))/apigee-gitops-image
+    tag: latest
+    username: ((docker-registry-username))
+    password: ((docker-registry-password))
+
+jobs:
+- name: build-and-push
+  plan:
+  - get: apigee-gitops-repo
+  - task: build-task-image
+    privileged: true
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: concourse/oci-build-task
+      inputs:
+      - name: apigee-gitops-repo
+      outputs:
+      - name: image
+      params:
+        CONTEXT: apigee-gitops-repo/scripts
+      run:
+        path: build
+  - put: apigee-gitops-image
+    params:
+      image: image/image.tar
